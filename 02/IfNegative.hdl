@@ -1,0 +1,10 @@
+CHIP IfNegative {
+    IN in[16];
+    OUT out;
+
+    PARTS:
+    Mux(a=false, b=true, sel=in[15], out=out1);
+    IfZero(in=in, out=ifzero);
+    Not(in=ifzero, out=ifnotzero);
+    And(a=out1, b=ifnotzero, out=out);
+}

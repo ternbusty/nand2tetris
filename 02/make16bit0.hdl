@@ -1,0 +1,22 @@
+CHIP make16bit0 {
+    IN in;
+    OUT out[16];
+
+    PARTS:
+    always0(in=in, out=out[0]);
+    always0(in=in, out=out[1]);
+    always0(in=in, out=out[2]);
+    always0(in=in, out=out[3]);
+    always0(in=in, out=out[4]);
+    always0(in=in, out=out[5]);
+    always0(in=in, out=out[6]);
+    always0(in=in, out=out[7]);
+    always0(in=in, out=out[8]);
+    always0(in=in, out=out[9]);
+    always0(in=in, out=out[10]);
+    always0(in=in, out=out[11]);
+    always0(in=in, out=out[12]);
+    always0(in=in, out=out[13]);
+    always0(in=in, out=out[14]);
+    always0(in=in, out=out[15]);
+}

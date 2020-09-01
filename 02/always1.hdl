@@ -1,0 +1,8 @@
+CHIP always1 {
+    IN in;
+    OUT out;
+
+    PARTS:
+    Not(in=in, out=notin);
+    Or(a=in, b=notin, out=out);
+}
