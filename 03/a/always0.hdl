@@ -1,0 +1,8 @@
+CHIP always0 {
+    IN in;
+    OUT out;
+
+    PARTS:
+    Not(in=in, out=notin);
+    And(a=in, b=notin, out=out);
+}
