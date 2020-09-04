@@ -11,4 +11,52 @@
 // "white" in every pixel;
 // the screen should remain fully clear as long as no key is pressed.
 
-// Put your code here.
+(LOOP)
+    @24576
+    D = M
+    @WHITE
+    D;JGT // if D > 0, jump to WHITE
+(BLACK)
+    @i
+    M = 0 // i = 1
+(BLACKLOOP)
+    @i
+    D = M // D = i
+    @8191
+    D = D - A // D = D - 8192
+    @BLACKEND
+    D;JGT // if D > 0, jump to END
+    @i
+    D = M // D = i
+    @SCREEN
+    A = A + D // A = SCREEN + i
+    M = 1 // paint to black
+    @i
+    M = M + 1 // i = i + 1
+    @BLACKLOOP
+    0;JMP
+(BLACKEND)
+    @LOOP
+    0;JMP
+(WHITE)
+    @j
+    M = 0
+(WHITELOOP)
+    @j
+    D = M // D = j
+    @8191
+    D = D - A // D = D - 8192
+    @WHITEEND
+    D;JGT // if D > 0, jump to END
+    @j
+    D = M // D = j
+    @SCREEN
+    A = A + D // A = SCREEN + j
+    M = 0 // paint to white
+    @j
+    M = M + 1 // j = j + 1
+    @WHITELOOP
+    0;JMP
+(WHITEEND)
+    @LOOP
+    0;JMP
