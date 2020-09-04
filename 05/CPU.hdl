@@ -39,5 +39,46 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    // instruction[0] が 0 のとき A 命令、1 のとき C 命令
+    Mux(a=false, b=true, sel=instruction[15], out=isC);
+
+    // instruction[3] は d ビット
+    // M に書き込むかどうかを決定する
+    Or(a=instruction[3], b=false, out=tmp);
+    // writeM の出力。A のときは無条件で false
+    Mux(a=false, b=tmp, sel=isC, out=writeM);
+    
+    // instruction[5] は d ビット
+    // A 命令であるか, あるいは C 命令でかつ instruction[5] == 1 なら load する
+    Mux(a=true, b=instruction[5], sel=isC, out=loadA);
+    // A 命令なら instruction を、C 命令なら outALU を読み込む
+    Mux16(a=instruction, b=outALU, sel=isC, out=loadobj);
+    ARegister(in=loadobj, load=loadA, out=outA);
+    // addressM を出力する。先頭の 1 bit を削る
+    Trim16to15(in=outA, out=addressM);
+
+    // 計算結果を D レジスタに保存する
+    // instruction[4] は d ビット
+    Mux(a=false, b=instruction[4], sel=isC, out=loadD);
+    DRegister(in=outALU, load=loadD, out=outD);
+
+    // instruction[12] は、ALU が A レジスタかメモリ入力のどちらを操作するか決定する
+    // 0 のとき A, 1 のとき M
+    Mux16(a=outA, b=inM, sel=instruction[12], out=AorM);
+    // ALU
+    ALU(x=outD, y=AorM, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=outALU, zr=zr, ng=ng);
+    // C 命令のとき outM を出力。A 命令の時は何を出力しても良い
+    Mux16(a=false, b=outALU, sel=isC, out=outM);
+
+    // load は
+    // - ALU の出力
+    // - jump 領域
+    // で決定され、ALU の出力 (outM) が jump の条件を満たしているかで決定する
+    Jump(in=instruction[0..2], zr=zr, ng=ng, out=loadJump);
+    Mux(a=false, b=loadJump, sel=isC, out=load);
+    // in には A レジスタからの出力が入る
+    // load あるいは reset が 1 のときはどうせ無視されるので、inc は常に 1 でよい
+    PC(in=outA, load=load, inc=true, reset=reset, out=outPC);
+    // PC を出力。先頭の 1 bit を削る
+    Trim16to15(in=outPC, out=pc);
 }

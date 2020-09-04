@@ -1,0 +1,15 @@
+CHIP Jump {
+    IN in[3], zr, ng;
+    OUT out;
+
+    PARTS:
+    Or(a=zr, b=ng, out=tmp);
+    Not(in=tmp, out=pg);
+
+    And(a=in[2], b=ng, out=out0);
+    And(a=in[1], b=zr, out=out1);
+    And(a=in[0], b=pg, out=out2);
+
+    Or(a=out0, b=out1, out=out3);
+    Or(a=out2, b=out3, out=out);
+}

@@ -27,5 +27,18 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    And(a=address[13], b=address[14], out=ifkey0);
+    Not(in=address[13], out=not13);
+    And(a=not13, b=address[14], out=ifsc0);
+    DMux(in=true, sel=address[14], a=ifram0, b=tmp);
+
+    And(a=ifram0, b=load, out=ifram);
+    And(a=ifsc0, b=load, out=ifsc);
+
+    RAM16K(in=in, load=ifram, address=address[0..13], out=outram);
+    Screen(in=in, load=ifsc, address=address[0..12], out=outsc);
+    Keyboard(out=outkey);
+
+    Mux16(a=outsc, b=outkey, sel=address[13], out=scorkey);
+    Mux16(a=outram, b=scorkey, sel=address[14], out=out);
 }
