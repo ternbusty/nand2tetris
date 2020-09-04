@@ -18,19 +18,27 @@
     D;JGT // if D > 0, jump to WHITE
 (BLACK)
     @i
-    M = 0 // i = 1
+    M = 0 // i = 0
 (BLACKLOOP)
     @i
     D = M // D = i
     @8191
-    D = D - A // D = D - 8192
+    D = D - A // D = D - 8191
     @BLACKEND
     D;JGT // if D > 0, jump to END
     @i
     D = M // D = i
     @SCREEN
-    A = A + D // A = SCREEN + i
-    M = 1 // paint to black
+    D = A + D // D = SCREEN + i
+    @idx
+    M = D // idx = SCREEN + i
+    @32767
+    D = A // D = 32767
+    D = D + A // D = 65534
+    D = D + 1 // D = 65535
+    @idx
+    A = M // A = SCREEN + i
+    M = D // paint to black
     @i
     M = M + 1 // i = i + 1
     @BLACKLOOP
