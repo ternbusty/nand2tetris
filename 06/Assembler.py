@@ -119,6 +119,10 @@ class Parser:
         # If not L_COMMAND, one row will be added to the output file
         if command_type != 'L_COMMAND':
             self.output_file_row_idx += 1
+        if self.is_first_run:
+            if command_type == 'L_COMMAND':
+                self.processL()
+            return
         if command_type == 'C_COMMAND':
             self.processC()
         elif command_type == 'A_COMMAND':
@@ -132,12 +136,6 @@ class Parser:
         path_w = p_file.with_suffix('.hack')
         with open(path_w, mode='w') as f:
             f.write(self.output)
-
-    # def hasMoreCommands(self):
-    #     if self.input_file_row_idx >= len(self.lines):
-    #         return False
-    #     else:
-    #         return True
 
     def advance(self):
         for line in self.lines:
@@ -156,38 +154,3 @@ if __name__ == '__main__':
     parser_obj.advance()
     parser_obj.is_first_run = False
     parser_obj.advance()
-
-# path = './add/Add.asm'
-# with open(path) as f:
-#     s = f.read()
-# s = s.replace(' ', '')
-# s = re.sub(r'//.*\n', '\n', s)
-# lines = s.split('\n')
-# lines = [line for line in lines if line != '']
-
-
-# class Code:
-#     def dest(self, dest_mnemonic):
-#         if dest_mnemonic == 'null':
-#             return
-#         if 'A' in dest_mnemonic:
-#             Parser.binary[10] = 1
-#         if 'D' in dest_mnemonic:
-#             Parser.binary[11] = 1
-#         if 'M' in dest_mnemonic:
-#             Parser.binary[12] = 1
-
-#     def comp(self, comp_mnemonic):
-#         comp_mnemonic.replace('M', 'A')
-#         for comp_mnemonic in comp_dic.items():
-#             if comp_mnemonic in self.line:
-#                 c = comp_mnemonic
-#                 break
-#         for i in range(6):
-#             Parser.binary[i + 4] = c[i]
-
-#     def jump(self, jump_mnemonic):
-#         b = jump_dic[jump_mnemonic]
-#         Parser.binary[13] = b[0]
-#         Parser.binary[14] = b[1]
-#         Parser.binary[15] = b[2]
