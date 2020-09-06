@@ -45,7 +45,7 @@ class Parser:
                 self.output += '\nM = D\n'
         else:
             if arg1 == 'static':
-                filename = self.p_file.stem()
+                filename = self.p_file.stem
                 self.output += '@' + filename + '.' + str(arg2)
                 if is_push:
                     self.output += '\nD = M\n'
