@@ -25,6 +25,10 @@ class Parser:
         self.lines = [line for line in self.lines if line != '']
         print(self.lines)
         self.output = ''
+        self.appendix_idx = 0
+        self.appendix_first = '@END\n0;JMP\n'
+        self.appendix = ''
+        self.appendix_last = '(END)\n'
 
     def processPushPop(self, arg1, arg2, is_push):
         dic = {
@@ -69,14 +73,15 @@ class Parser:
             self.output += update_top_to_d + increment_sp
 
     def processArithmetric(self, command):
-        self.output += decrement_sp
+        # If 'neg' or 'not', we don't need to decrement sp
         if command == 'neg' or command == 'not':
-            self.output += update_address_to_top
+            self.output += update_address_to_top + move_address_backward
             if command == 'neg':
                 self.output += 'M = -M\n'
             else:
                 self.output += 'M = !M\n'
             return
+        self.output += decrement_sp
         # D = Stack[top], M = Stack[top - 1]
         self.output += update_d_to_top + move_address_backward
         if command == 'add':
@@ -87,9 +92,19 @@ class Parser:
             self.output += 'M = D & M\n'
         elif command == 'or':
             self.output += 'M = D | M\n'
-        # elif command == 'eq':
-        # elif command == 'gt':
-        # elif command == 'lt':
+        else:
+            self.appendix += '(TRUE' + str(self.appendix_idx) + \
+                ')\n@SP\nA = M - 1\nM = -1\n@BACK' + str(self.appendix_idx) + '\n0;JMP\n'
+            if command == 'eq':
+                self.output += 'D = M - D\n@TRUE' + \
+                    str(self.appendix_idx) + '\nD;JEQ\n@SP\nA = M - 1\nM = 0\n(BACK' + str(self.appendix_idx) + ')\n'
+            if command == 'gt':
+                self.output += 'D = M - D\n@TRUE' + \
+                    str(self.appendix_idx) + '\nD;JGT\n@SP\nA = M - 1\nM = 0\n(BACK' + str(self.appendix_idx) + ')\n'
+            if command == 'lt':
+                self.output += 'D = M - D\n@TRUE' + \
+                    str(self.appendix_idx) + '\nD;JLT\n@SP\nA = M - 1\nM = 0\n(BACK' + str(self.appendix_idx) + ')\n'
+            self.appendix_idx += 1
 
     def commandType(self):
         command = self.line.split(' ')[0]
@@ -140,6 +155,8 @@ class Parser:
 
     def saveToFile(self):
         path_w = self.p_file.with_suffix('.asm')
+        if self.appendix != '':
+            self.output += self.appendix_first + self.appendix + self.appendix_last
         with open(path_w, mode='w') as f:
             f.write(self.output)
 
