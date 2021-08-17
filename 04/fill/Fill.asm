@@ -32,13 +32,9 @@
     D = A + D // D = SCREEN + i
     @idx
     M = D // idx = SCREEN + i
-    @32767
-    D = A // D = 32767
-    D = D + A // D = 65534
-    D = D + 1 // D = 65535
     @idx
     A = M // A = SCREEN + i
-    M = D // paint to black
+    M = 1 // paint to black
     @i
     M = M + 1 // i = i + 1
     @BLACKLOOP
