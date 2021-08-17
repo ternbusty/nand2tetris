@@ -16,11 +16,11 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
-    make16bit0(in=true, out=zero); // out[t + 1] = 0
     Inc16(in=fb, out=outinc); // out[t + 1] = out[t] + 1
 
-    Mux16(a=fb, b=outinc, sel=inc, out=out1);
-    Mux16(a=out1, b=in, sel=load, out=out2); // out[t + 1] = in[t]
-    Mux16(a=out2, b=zero, sel=reset, out=out3);
+    Mux16(a=fb, b=outinc, sel=inc, out=out1); // inc なら outinc が返る
+    Mux16(a=out1, b=in, sel=load, out=out2); // load なら in が返る
+    Mux16(a=out2, b=false, sel=reset, out=out3); // reset なら zero が返る
+    // ここまで、いずれもあてはまらない場合 out3 には fb が格納されている
     Register(in=out3, load=true, out=out, out=fb);
 }

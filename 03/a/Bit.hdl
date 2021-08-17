@@ -14,6 +14,7 @@ CHIP Bit {
     OUT out;
 
     PARTS:
+    // fb は feedback の意
     Mux(a=fb, b=in, sel=load, out=out1);
     DFF(in=out1, out=out, out=fb);
 }
