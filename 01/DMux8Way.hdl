@@ -16,11 +16,12 @@ CHIP DMux8Way {
     OUT a, b, c, d, e, f, g, h;
 
     PARTS:
+    // 0 を作るための作業
     Not(in=in, out=notin);
     And(a=in, b=notin, out=zero);
 
-    DMux4Way(in=in, sel=sel[0..1], a=a1, b=b1, c=c1, d=d1);
-    DMux4Way(in=in, sel=sel[0..1], a=e1, b=f1, c=g1, d=h1);
+    DMux4Way(in=in, sel=sel[0..1], a=a1, b=b1, c=c1, d=d1); // sel[2] = 0 ならこれが採用、残りは 0
+    DMux4Way(in=in, sel=sel[0..1], a=e1, b=f1, c=g1, d=h1); // sel[2] = 1 ならこれが採用、残りは 0
 
     Mux(a=a1, b=zero, sel=sel[2], out=a);
     Mux(a=b1, b=zero, sel=sel[2], out=b);
@@ -30,4 +31,9 @@ CHIP DMux8Way {
     Mux(a=zero, b=f1, sel=sel[2], out=f);
     Mux(a=zero, b=g1, sel=sel[2], out=g);
     Mux(a=zero, b=h1, sel=sel[2], out=h);
+
+    // もっと簡潔に書ける
+    // DMux(in=in, sel=sel[2], a=w1, b=w2);
+    // DMux4Way(in=w1, sel=sel[0..1], a=a, b=b, c=c, d=d);
+    // DMux4Way(in=w2, sel=sel[0..1], a=e, b=f, c=g, d=h);
 }

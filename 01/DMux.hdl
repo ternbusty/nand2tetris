@@ -15,6 +15,6 @@ CHIP DMux {
 
     PARTS:
     Not(in=sel, out=notsel);
-    And(a=in, b=notsel, out=a);
-    And(a=in, b=sel, out=b);
+    And(a=in, b=notsel, out=a); // a は in と not(sel) との And
+    And(a=in, b=sel, out=b); // b は in と sel との And
 }

@@ -15,7 +15,8 @@ CHIP Mux {
 
     PARTS:
     Not(in=sel, out=notsel);
-    Or(a=a, b=sel, out=aout);
-    Or(a=b, b=notsel, out=bout);
-    And(a=aout, b=bout, out=out);
+    // 例えば、sel = 0 のとき (a が選ばれるとき)
+    Or(a=a, b=sel, out=aout); // aout = a となる
+    Or(a=b, b=notsel, out=bout); // notsel = 1 なので bout = 1 となり、下の And 式の結果に影響しない
+    And(a=aout, b=bout, out=out); // 結果的に aout = a の値が出てくる
 }

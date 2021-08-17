@@ -16,12 +16,21 @@ CHIP DMux4Way {
     OUT a, b, c, d;
 
     PARTS:
-    DMux(in=in, sel=sel[0], a=a1, b=b1);
-    DMux(in=in, sel=sel[0], a=c1, b=d1);
+    DMux(in=in, sel=sel[0], a=a1, b=b1); // sel[1] = 0 ならこの結果が採用され、残りの c = d = 0
+    DMux(in=in, sel=sel[0], a=c1, b=d1); // sel[1] = 1 ならこの結果が採用され、残りの a = b = 0
+    // 0 を作るための作業
     Not(in=in, out=notin);
     And(a=in, b=notin, out=zero);
-    Mux(a=a1, b=zero, sel=sel[1], out=a);
+    // sel[1] の値に基づいて振り分け
+    Mux(a=a1, b=zero, sel=sel[1], out=a); // sel[1] = 0 なら a1 が採用され、そうでなければ 0
     Mux(a=b1, b=zero, sel=sel[1], out=b);
-    Mux(a=zero, b=c1, sel=sel[1], out=c);
+    Mux(a=zero, b=c1, sel=sel[1], out=c); // sel[1] = 1 なら c1 が採用され、そうでなければ 1
     Mux(a=zero, b=d1, sel=sel[1], out=d);
+
+    // もっと簡潔に書ける
+    // DMux(in=in, sel=sel[1], a=w1, b=w2); // sel[1] = 0 なら w1 = in、sel[1] = 1 なら w1 = 0 となる
+    // // 以下で、sel[1] = 0 なら w1 = in が正しく a か b かどちらかに振り分けられるし、
+    // // sel[1] = 1 なら、そもそも w1 = 0 なので a も b も 0 になるという仕組み
+    // DMux(in=w1, sel=sel[0], a=a, b=b); 
+    // DMux(in=w2, sel=sel[0], a=c, b=d);
 }
