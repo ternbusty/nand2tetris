@@ -3,6 +3,7 @@ CHIP IfNegative {
     OUT out;
 
     PARTS:
+    // こんなことしなくても、単に in[15] そのものを返せばよいだけでは……
     Mux(a=false, b=true, sel=in[15], out=out1);
     IfZero(in=in, out=ifzero);
     Not(in=ifzero, out=ifnotzero);

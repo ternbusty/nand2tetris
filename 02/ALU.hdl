@@ -44,25 +44,32 @@ CHIP ALU {
     PARTS:
     make16bit0(in=true, out=zero16);
 
-    Mux16(a=x, b=zero16, sel=zx, out=x1);
-    Negate16(in=x1, out=xnegate);
+    // if zx then x = 0
+    Mux16(a=x, b=zero16, sel=zx, out=x1); // b = false と簡潔に書ける
+    // if nx then x = !x 
+    Negate16(in=x1, out=xnegate); // Not16 と同じものだからわざわざ新たに定義する必要はなかったね
     Mux16(a=x1, b=xnegate, sel=nx, out=x2);
 
+    // if ny then y = 0
     Mux16(a=y, b=zero16, sel=zy, out=y1);
+    // if ny then y = !y
     Negate16(in=y1, out=ynegate);
     Mux16(a=y1, b=ynegate, sel=ny, out=y2);
 
-    And16(a=x2, b=y2, out=andxy);
+    // if f then out = x + y else out = x & y
+    And16(a=x2, b=y2, out=andxy); // ありうる出力を先に全部書き出しておくのがポイント
     Add16(a=x2, b=y2, out=addxy);
     Mux16(a=andxy, b=addxy, sel=f, out=out1);
 
-    Negate16(in=out1, out=out1negate);
+    // if no then out = !out
+    Negate16(in=out1, out=out1negate); // 反転したものを準備
     Mux16(a=out1, b=out1negate, sel=no, out=out2);
     Copy(in=out2, out=out);
 
+    // if out = 0 then zr = 1 else zr = 0
     IfZero(in=out2, out=ifzero);
-    IfNegative(in=out2, out=ifnegative);
-
     Mux(a=false, b=true, sel=ifzero, out=zr);
+    // if out < 0 then ng = 1 else ng = 0
+    IfNegative(in=out2, out=ifnegative); // 単に out[15] = ng と書ける
     Mux(a=false, b=true, sel=ifnegative, out=ng);
 }

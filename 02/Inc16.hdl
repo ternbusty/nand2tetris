@@ -13,6 +13,7 @@ CHIP Inc16 {
     OUT out[16];
 
     PARTS:
+    // こんなことをして 16 bit の 1 を作らなくても、単に b[0] = true, b[1..15] = false でよい
     make16bit1(in=true, out=one);
     Add16(a=in, b=one, out=out);
 }

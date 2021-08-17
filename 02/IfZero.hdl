@@ -13,6 +13,7 @@ CHIP IfZero {
     OUT out;
 
     PARTS:
+    // Or8Way を使えばもうちょっと簡潔に書けるよ
     Or(a=in[0], b=in[1], out=out1);
     Or(a=out1, b=in[2], out=out2);
     Or(a=out2, b=in[3], out=out3);
