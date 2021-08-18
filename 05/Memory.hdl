@@ -27,9 +27,13 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
+    // デマルチプレキサ (4 way) を使えばもっと簡潔に書ける
+    // address[13] = address[14] = 1 ならキーボード (ifkey0 = 1)
     And(a=address[13], b=address[14], out=ifkey0);
+    // address[13] = 0, address[14] = 1 ならスクリーン (ifsc0 = 1)
     Not(in=address[13], out=not13);
     And(a=not13, b=address[14], out=ifsc0);
+    // address[14] = 0 なら RAM (ifram0 = 1)
     DMux(in=true, sel=address[14], a=ifram0, b=tmp);
 
     And(a=ifram0, b=load, out=ifram);
@@ -39,6 +43,9 @@ CHIP Memory {
     Screen(in=in, load=ifsc, address=address[0..12], out=outsc);
     Keyboard(out=outkey);
 
+    // マルチプレキサ (4way) を使えばもっと簡潔に書ける
+    // address[13] = 0 ならスクリーン、1 ならキーボード
     Mux16(a=outsc, b=outkey, sel=address[13], out=scorkey);
+    // address[14] = 0 なら RAM、1 ならスクリーンかキーボードのどちらか
     Mux16(a=outram, b=scorkey, sel=address[14], out=out);
 }

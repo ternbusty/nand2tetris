@@ -3,13 +3,16 @@ CHIP Jump {
     OUT out;
 
     PARTS:
+    // 正のときを表すフラグ (pg) を作る
     Or(a=zr, b=ng, out=tmp);
     Not(in=tmp, out=pg);
 
+    // in[0] は 正、in[1] はゼロ、in[2] は負のときを表す
     And(a=in[2], b=ng, out=out0);
     And(a=in[1], b=zr, out=out1);
     And(a=in[0], b=pg, out=out2);
 
+    // out0-2 のいずれかに該当する場合は true を返す
     Or(a=out0, b=out1, out=out3);
     Or(a=out2, b=out3, out=out);
 }
