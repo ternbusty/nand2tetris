@@ -10,16 +10,7 @@ M = M - 1
 @SP
 A = M
 D = M
-@0
-D = A
 @LCL
-D = M + D
-@R13
-M = D
-@SP
-A = M
-D = M
-@R13
 A = M
 M = D
 @21
@@ -41,34 +32,19 @@ M = M - 1
 @SP
 A = M
 D = M
-@2
-D = A
 @ARG
-D = M + D
-@R13
-M = D
-@SP
 A = M
-D = M
-@R13
-A = M
+A = A + 1
+A = A + 1
 M = D
 @SP
 M = M - 1
 @SP
 A = M
 D = M
-@1
-D = A
 @ARG
-D = M + D
-@R13
-M = D
-@SP
 A = M
-D = M
-@R13
-A = M
+A = A + 1
 M = D
 @36
 D = A
@@ -82,17 +58,14 @@ M = M - 1
 @SP
 A = M
 D = M
-@6
-D = A
 @THIS
-D = M + D
-@R13
-M = D
-@SP
 A = M
-D = M
-@R13
-A = M
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
 M = D
 @42
 D = A
@@ -113,34 +86,23 @@ M = M - 1
 @SP
 A = M
 D = M
-@5
-D = A
 @THAT
-D = M + D
-@R13
-M = D
-@SP
 A = M
-D = M
-@R13
-A = M
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
 M = D
 @SP
 M = M - 1
 @SP
 A = M
 D = M
-@2
-D = A
 @THAT
-D = M + D
-@R13
-M = D
-@SP
 A = M
-D = M
-@R13
-A = M
+A = A + 1
+A = A + 1
 M = D
 @510
 D = A
@@ -154,17 +116,13 @@ M = M - 1
 @SP
 A = M
 D = M
-@6
-D = A
 @5
-D = A + D
-@R13
-M = D
-@SP
-A = M
-D = M
-@R13
-A = M
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
+A = A + 1
 M = D
 @0
 D = A
@@ -175,18 +133,12 @@ D = M
 A = M
 M = D
 @SP
-A = M
-M = D
-@SP
 M = M + 1
 @5
 D = A
 @THAT
 A = M + D
 D = M
-@SP
-A = M
-M = D
 @SP
 A = M
 M = D
@@ -208,9 +160,6 @@ D = M
 A = M
 M = D
 @SP
-A = M
-M = D
-@SP
 M = M + 1
 @SP
 M = M - 1
@@ -228,18 +177,12 @@ D = M
 A = M
 M = D
 @SP
-A = M
-M = D
-@SP
 M = M + 1
 @6
 D = A
 @THIS
 A = M + D
 D = M
-@SP
-A = M
-M = D
 @SP
 A = M
 M = D
@@ -264,9 +207,6 @@ D = A
 @5
 A = A + D
 D = M
-@SP
-A = M
-M = D
 @SP
 A = M
 M = D
