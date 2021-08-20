@@ -116,6 +116,46 @@ class CodeWriter:
         self.addAppendixLines([f'(TRUE{self.appendix_idx})'] + self.snippets['decrement_sp'] + [f'@{arg1}', '0;JMP'])
         self.appendix_idx += 1
 
+    def processFunction(self, arg1: str, arg2: str) -> None:
+        self.addOutputLines([f'({arg1})'])
+        for i in range(int(arg2)):
+            self.processPush('constant', 0)
+            self.processPush('local', i)
+
+    def processReturn(self) -> None:
+        updateAddressToOriginal = lambda label, times: self.addOutputLines(
+            ['@LCL', 'A = M'] + ['A = A - 1' for _ in range(times)] + ['D = M', f'@{label}', 'M = D'])
+        # Place return value to argument 0
+        self.processPop('argument', '0')  # *ARG = pop()
+        self.addOutputLines(['@ARG', 'D = M + 1', '@SP', 'M = D'])  # SP = ARG + 1
+        updateAddressToOriginal('ret', 5)  # ret = *(LCL - 5)
+        updateAddressToOriginal('THAT', 1)  # THAT = *(LCL - 1)
+        updateAddressToOriginal('THIS', 2)  # THIS = *(LCL - 2)
+        updateAddressToOriginal('ARG', 3)  # ARG = *(LCL - 3)
+        updateAddressToOriginal('LCL', 4)  # LCL = *(LCL - 4)
+        self.addOutputLines(['@ret', 'A = M', '0;JMP'])  # goto ret
+
+    def processCall(self, arg1: str, arg2: str):
+        self.processPush('constant', self.getLineNum() + 39)  # push return-address
+        pushLabel = lambda label: self.addOutputLines(
+            f'@{label}',
+            'D = M',
+            self.snippets['copy_d_to_stack_top'] +  # 3 lines
+            self.snippets['increment_sp'])  # 2 lines
+        pushLabel('LCL')  # push LCL
+        pushLabel('ARG')  # push ARG
+        pushLabel('THIS')  # push THIS
+        pushLabel('THAT')  # push THAT
+        self.addOutputLines(['@SP', 'D = M'] +
+                            ['D = D - 1' for _ in range(int(arg2) + 5)] +
+                            ['@ARG', 'M = D'])  # ARG = SP - arg2 - 5
+        self.addOutputLines(['@SP', 'D = M', '@LCL', 'M = D'])  # LCL = SP
+        self.processGoto(arg1)  # goto f
+        self.addOutputLines(['(return-address)'])
+
+    def getLineNum(self) -> int:
+        return len(self.output.split('\n'))
+
     def addOutputLines(self, lines: 'list[str]') -> None:
         self.output += '\n'.join(lines) + '\n'
 
@@ -215,5 +255,11 @@ if __name__ == '__main__':
             writer.processGoto(parser.arg1())
         elif command_type == 'C_IF':
             writer.processIfGoto(parser.arg1())
+        elif command_type == 'C_FUNCTION':
+            writer.processFunction(parser.arg1(), parser.arg2())
+        elif command_type == 'C_RETURN':
+            writer.processReturn()
+        elif command_type == 'C_CALL':
+            writer.processCall()
 
     writer.saveToFile()
