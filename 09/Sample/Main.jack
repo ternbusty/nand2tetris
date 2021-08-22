@@ -1,0 +1,23 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/09/Average/Main.jack
+
+// Inputs some numbers and computes their average
+class Main {
+   function void main() {
+      var int s;
+
+      let s = Keyboard.readInt("");
+      if (s < 126) {
+        do Output.printInt(4);
+      } else {
+        if (s < 212) {
+          do Output.printInt(6);
+        } else {
+          do Output.printInt(8); 
+        }
+      }
+      return;
+   }
+}

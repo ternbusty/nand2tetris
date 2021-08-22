@@ -1,0 +1,34 @@
+function Main.main 1
+push constant 0
+call String.new 1
+call Keyboard.readInt 1
+pop local 0
+push local 0
+push constant 126
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 4
+call Output.printInt 1
+pop temp 0
+goto IF_END0
+label IF_FALSE0
+push local 0
+push constant 212
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 6
+call Output.printInt 1
+pop temp 0
+goto IF_END1
+label IF_FALSE1
+push constant 8
+call Output.printInt 1
+pop temp 0
+label IF_END1
+label IF_END0
+push constant 0
+return
