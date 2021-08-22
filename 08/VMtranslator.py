@@ -4,8 +4,12 @@ import sys
 
 
 class CodeWriter:
-    def __init__(self, path) -> None:
-        self.setFileName(path)
+    def __init__(self, p_path: pathlib.Path) -> None:
+        if p_path.is_dir():
+            self.path_w = f'{p_path}/{p_path.stem}.asm'
+        else:
+            self.path_w = p_path.with_suffix('.asm')
+        print(self.path_w)
         self.dic = {
             'local': '@LCL',
             'argument': '@ARG',
@@ -22,14 +26,16 @@ class CodeWriter:
             'update_address_to_top': ['@SP', 'A = M'],
             'move_address_backward': ['A = A - 1']
         }
-        self.output: str = ''
         self.appendix: str = ''
         self.appendix_idx: int = 0
+        self.output: str = ''
+        self.return_address_idx: int = 0
+        self.ret_idx: int = 0
+        self.addOutputLines(['@256', 'D = A', '@SP', 'M = D'])
+        self.processCall('Sys.init', 0)
 
-    def setFileName(self, path) -> None:
-        self.p_file = pathlib.Path(path)
-        self.filename: str = self.p_file.stem  # get filename
-        self.path_w = self.p_file.with_suffix('.asm')
+    def setFileName(self, p_file: pathlib.Path) -> None:
+        self.filename: str = p_file.stem  # get filename
 
     def processPush(self, arg1: str, arg2: str) -> None:
         if arg1 == 'constant':
@@ -126,22 +132,29 @@ class CodeWriter:
         updateAddressToOriginal = lambda label, times: self.addOutputLines(
             ['@LCL', 'A = M'] + ['A = A - 1' for _ in range(times)] + ['D = M', f'@{label}', 'M = D'])
         # Place return value to argument 0
+        updateAddressToOriginal(f'ret{self.ret_idx}', 5)  # ret = *(LCL - 5)
         self.processPop('argument', '0')  # *ARG = pop()
         self.addOutputLines(['@ARG', 'D = M + 1', '@SP', 'M = D'])  # SP = ARG + 1
-        updateAddressToOriginal('ret', 5)  # ret = *(LCL - 5)
+        # updateAddressToOriginal(f'ret', 5)  # ret = *(LCL - 5)
         updateAddressToOriginal('THAT', 1)  # THAT = *(LCL - 1)
         updateAddressToOriginal('THIS', 2)  # THIS = *(LCL - 2)
         updateAddressToOriginal('ARG', 3)  # ARG = *(LCL - 3)
         updateAddressToOriginal('LCL', 4)  # LCL = *(LCL - 4)
-        self.addOutputLines(['@ret', 'A = M', '0;JMP'])  # goto ret
+        # self.addOutputLines([f'@ret', 'A = M', '0;JMP'])  # goto ret
+        self.addOutputLines([f'@ret{self.ret_idx}', 'A = M', '0;JMP'])  # goto ret
+        self.ret_idx += 1
 
     def processCall(self, arg1: str, arg2: str):
-        self.processPush('constant', self.getLineNum() + 39)  # push return-address
+        # self.processPush('constant', self.getLineNum() + 50 + int(arg2))  # push return_address
+        # arg2 = max(int(arg2), 1)
+        self.addOutputLines(
+            [f'@return_address_{self.return_address_idx}', 'D = A'] +
+            self.snippets['copy_d_to_stack_top'] +
+            self.snippets['increment_sp'])  # push return-address
         pushLabel = lambda label: self.addOutputLines(
-            f'@{label}',
-            'D = M',
-            self.snippets['copy_d_to_stack_top'] +  # 3 lines
-            self.snippets['increment_sp'])  # 2 lines
+            [f'@{label}', 'D = M'] +
+            self.snippets['copy_d_to_stack_top'] +
+            self.snippets['increment_sp'])
         pushLabel('LCL')  # push LCL
         pushLabel('ARG')  # push ARG
         pushLabel('THIS')  # push THIS
@@ -151,7 +164,8 @@ class CodeWriter:
                             ['@ARG', 'M = D'])  # ARG = SP - arg2 - 5
         self.addOutputLines(['@SP', 'D = M', '@LCL', 'M = D'])  # LCL = SP
         self.processGoto(arg1)  # goto f
-        self.addOutputLines(['(return-address)'])
+        self.addOutputLines([f'(return_address_{self.return_address_idx})'])
+        self.return_address_idx += 1
 
     def getLineNum(self) -> int:
         return len(self.output.split('\n'))
@@ -237,29 +251,37 @@ class Parser:
 
 if __name__ == '__main__':
     path: str = sys.argv[1]
-    parser = Parser(path)
-    writer = CodeWriter(path)
+    p_path: pathlib.Path = pathlib.Path(path)
+    p_file_list: 'list[pathlib.Path]' = []
+    if p_path.is_dir():
+        p_file_list = list(p_path.glob('**/*.vm'))
+    else:
+        p_file_list = [p_path]
 
-    while parser.hasMoreCommands():
-        parser.advance()
-        command_type: str = parser.commandType()
-        if command_type == 'C_ARITHMETIC':
-            writer.processArithmetric(parser.arg1())
-        elif command_type == 'C_PUSH':
-            writer.processPush(parser.arg1(), parser.arg2())
-        elif command_type == 'C_POP':
-            writer.processPop(parser.arg1(), parser.arg2())
-        elif command_type == 'C_LABEL':
-            writer.processLabel(parser.arg1())
-        elif command_type == 'C_GOTO':
-            writer.processGoto(parser.arg1())
-        elif command_type == 'C_IF':
-            writer.processIfGoto(parser.arg1())
-        elif command_type == 'C_FUNCTION':
-            writer.processFunction(parser.arg1(), parser.arg2())
-        elif command_type == 'C_RETURN':
-            writer.processReturn()
-        elif command_type == 'C_CALL':
-            writer.processCall()
-
+    writer = CodeWriter(p_path)
+    for p_file in p_file_list:
+        parser = Parser(p_file)
+        writer.setFileName(p_file)
+        while parser.hasMoreCommands():
+            parser.advance()
+            command_type: str = parser.commandType()
+            if command_type == 'C_ARITHMETIC':
+                writer.processArithmetric(parser.arg1())
+            elif command_type == 'C_PUSH':
+                writer.processPush(parser.arg1(), parser.arg2())
+            elif command_type == 'C_POP':
+                writer.processPop(parser.arg1(), parser.arg2())
+            elif command_type == 'C_LABEL':
+                writer.processLabel(parser.arg1())
+            elif command_type == 'C_GOTO':
+                writer.processGoto(parser.arg1())
+            elif command_type == 'C_IF':
+                writer.processIfGoto(parser.arg1())
+            elif command_type == 'C_FUNCTION':
+                writer.processFunction(parser.arg1(), parser.arg2())
+            elif command_type == 'C_RETURN':
+                writer.processReturn()
+            elif command_type == 'C_CALL':
+                writer.processCall(parser.arg1(), parser.arg2())
+                print(parser.arg1(), ',', parser.arg2())
     writer.saveToFile()
