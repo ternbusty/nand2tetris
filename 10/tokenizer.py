@@ -6,8 +6,10 @@ import tokenDic
 
 class TokenObject:
     def __init__(self, token, token_type) -> None:
-        self.token = token
-        self.token_type = token_type
+        self.token: str = token
+        self.token_type: str = token_type
+        self.before: str = ''
+        self.after: str = ''
 
     def format(self) -> str:
         substitute_symbol_dic: str[str] = {'<': '&lt;', '>': '&gt;', '&': '&amp;'}
@@ -38,14 +40,14 @@ class JackTokenizer:
         token_objects: list[TokenObject] = []
         token: str = ''
         token_type: str = ''
-        len_of_word: int = len(line)
+        len_of_list: int = len(line)
         idx: int = 0
         beg_idx: int = 0
-        while idx < len_of_word:
+        while idx < len_of_list:
             if line[idx] == '"':
                 beg_idx = idx + 1
                 idx += 1
-                while idx < len_of_word:
+                while idx < len_of_list:
                     if line[idx] == '"':
                         token_objects.append(TokenObject(line[beg_idx:idx], 'STRING_CONST'))
                         beg_idx = idx + 1
@@ -91,7 +93,7 @@ class JackTokenizer:
 
     def advance(self) -> bool:
         print(self.current_line_num)
-        line = self.lines[self.current_line_num]
+        line: str = self.lines[self.current_line_num]
         token_objects = self.tokenizeLine(line)
         self.output += '\n'.join([token_object.format() for token_object in token_objects]) + '\n'
         self.current_line_num += 1
