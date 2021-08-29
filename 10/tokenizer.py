@@ -20,7 +20,12 @@ class TokenObject:
         temp_token_type = self.token_type.lower()
         if temp_token_type in substitute_type_dic.keys():
             temp_token_type = substitute_type_dic[temp_token_type]
-        return f'<{temp_token_type}> {temp_token} </{temp_token_type}>'
+        output = f'<{temp_token_type}> {temp_token} </{temp_token_type}>'
+        if self.before != '':
+            output = self.before + '\n' + output
+        if self.after != '':
+            output += '\n' + self.after
+        return output
 
 
 class JackTokenizer:
@@ -35,6 +40,7 @@ class JackTokenizer:
         self.current_line_num: int = 0
         self.line_num: int = len(self.lines)
         self.output: str = '<tokens>\n'
+        self.token_objects: list[TokenObject] = []
 
     def tokenizeLine(self, line: str) -> 'list[TokenObject]':
         token_objects: list[TokenObject] = []
@@ -96,6 +102,7 @@ class JackTokenizer:
         line: str = self.lines[self.current_line_num]
         token_objects = self.tokenizeLine(line)
         self.output += '\n'.join([token_object.format() for token_object in token_objects]) + '\n'
+        self.token_objects.extend(token_objects)
         self.current_line_num += 1
 
     def saveToFile(self) -> None:
