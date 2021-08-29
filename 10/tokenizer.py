@@ -8,8 +8,8 @@ class TokenObject:
     def __init__(self, token, token_type) -> None:
         self.token: str = token
         self.token_type: str = token_type
-        self.before: str = ''
-        self.after: str = ''
+        self.before: 'list[str]' = []
+        self.after: 'list[str]' = []
 
     def format(self) -> str:
         substitute_symbol_dic: str[str] = {'<': '&lt;', '>': '&gt;', '&': '&amp;'}
@@ -21,10 +21,10 @@ class TokenObject:
         if temp_token_type in substitute_type_dic.keys():
             temp_token_type = substitute_type_dic[temp_token_type]
         output = f'<{temp_token_type}> {temp_token} </{temp_token_type}>'
-        if self.before != '':
-            output = self.before + '\n' + output
-        if self.after != '':
-            output += '\n' + self.after
+        if len(self.before) != 0:
+            output = '\n'.join(self.before) + '\n' + output
+        if len(self.after) != 0:
+            output += '\n' + '\n'.join(self.after)
         return output
 
 

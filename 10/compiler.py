@@ -32,11 +32,11 @@ class CompilationEngine:
         'class' className '{' classVarDec* subroutineDec* '}'
         ex) class Bar {...}
         """
-        self.token_objects[start].before = '<class>'
+        self.token_objects[start].before.append('<class>')
         print(self.token_objects[start + 1].token)
         closing_class_body_idx: int = self.findClosingBracket(start + 2, end_script, '{', '}')
         self.compileClassBody(start + 3, closing_class_body_idx - 1)
-        self.token_objects[closing_class_body_idx].after = '</class>'
+        self.token_objects[closing_class_body_idx].after.append('</class>')
         return closing_class_body_idx
 
     def compileClassBody(self, start: int, end_class_body: int):
@@ -58,14 +58,14 @@ class CompilationEngine:
         ('static' | 'field') type varName (',' varName) * ';'
         ex) 'static int a;'
         """
-        self.token_objects[start].before = '<classVarDec>'
+        self.token_objects[start].before.append('<classVarDec>')
         print(self.token_objects[start + 1].token)
         idx: int = start
         while idx <= end_class_body:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after = '</classVarDec>'
+        self.token_objects[idx].after.append('</classVarDec>')
         return idx
 
     def compileSubroutineDec(self, start: int, end_class_body: int) -> int:
@@ -73,15 +73,15 @@ class CompilationEngine:
         ('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' '{' subroutineBody '}'
         ex) 'method int hoge (...) {...}'
         """
-        self.token_objects[start].before = '<subroutineDec>'
+        self.token_objects[start].before.append('<subroutineDec>')
         print(self.token_objects[start + 2].token)
         closing_param_list_idx: int = self.findClosingBracket(start + 3, end_class_body, '(', ')')
         self.compileParameterList(start + 4, closing_param_list_idx - 1)
-        self.token_objects[closing_param_list_idx + 1].before = '<subroutineBody>'
-        self.token_objects[end_class_body].after = '</subroutineBody>'
+        self.token_objects[closing_param_list_idx + 1].before.append('<subroutineBody>')
         closing_subr_body_idx: int = self.findClosingBracket(closing_param_list_idx + 1, end_class_body, '{', '}')
+        self.token_objects[closing_subr_body_idx].after.append('</subroutineBody>')
         self.compileSubroutineBody(closing_param_list_idx + 2, closing_subr_body_idx - 1)
-        self.token_objects[closing_subr_body_idx].after = '</subroutineDec>'
+        self.token_objects[closing_subr_body_idx].after.append('</subroutineDec>')
         return closing_subr_body_idx
 
     def compileSubroutineBody(self, start: int, end_body: int) -> None:
@@ -92,51 +92,67 @@ class CompilationEngine:
         if start >= end_body:
             return
         first_token: str = self.token_objects[start].token
-        print(first_token, start)
         if first_token == 'var':
             end_idx: int = self.compileVarDec(start, end_body)
             return self.compileSubroutineBody(end_idx + 1, end_body)
         else:
-            self.token_objects[start].before = '<statements>'
-            self.token_objects[end_body].after = '</statements>'
+            self.token_objects[start].before.append('<statements>')
             end_idx: int = self.compileStatements(start, end_body)
+            self.token_objects[end_body].after.append('</statements>')
             return
 
     def compileSubroutineCall(self, start: int, end: int) -> None:
         """
-        identifier '.' identifier '(' expressionList ')'
-        ex) 'a.run()'
+        subroutineName '(' expressionList ')' |
+        (className | varName) '.' subroutineName '(' expressionList ')'
+        ex) 'run()', 'a.run()'
         """
-        # print(start, self.token_objects[start].token, end, self.token_objects[end].token)
-        # print(self.token_objects[start + 3].token)
+        # self.token_objects[start].before.append('<term>')
         idx: int = start
         while self.token_objects[idx].token != '(':
             idx += 1
-        self.token_objects[idx].after = '<expressionList>'
+        self.token_objects[idx].after.append('<expressionList>')
         closing_expression_list = self.findClosingBracket(idx, end, '(', ')')
-        self.token_objects[closing_expression_list].before = '</expressionList>'
+        self.compileExpressionList(idx + 1, closing_expression_list - 1)
+        self.token_objects[closing_expression_list].before.append('</expressionList>')
+        # self.token_objects[end].after.append('</term>')
+
+    def compileExpressionList(self, start: int, end: int) -> None:
+        if start > end:
+            return
+        idx: int = start
+        exp_start_idx: int = start
+        while idx <= end:
+            if self.token_objects[idx].token == ',':
+                self.compileExpression(exp_start_idx, idx - 1)
+                exp_start_idx = idx + 1
+            idx += 1
+        self.compileExpression(exp_start_idx, end)
 
     def compileParameterList(self, start: int, end: int):
         """
         ((type varName) (',' type varName)*)?
         ex) 'int a, char c', ''
         """
-        print('start', start, 'end', end)
-        self.token_objects[min(start, end)].after = '<parameterList>'
-        self.token_objects[max(start, end)].before = '</parameterList>'
+        if start > end:
+            self.token_objects[end].after.append('<parameterList>')
+            self.token_objects[start].before.append('</parameterList>')
+        else:
+            self.token_objects[start].before.append('<parameterList>')
+            self.token_objects[end].after.append('</parameterList>')
 
     def compileVarDec(self, start: int, end_body: int) -> int:
         """
         'var' type varName (',' varname)* ';'
         ex) 'int a, b;';
         """
-        self.token_objects[start].before = '<varDec>'
+        self.token_objects[start].before.append('<varDec>')
         idx: int = start
         while idx <= end_body:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after = '</varDec>'
+        self.token_objects[idx].after.append('</varDec>')
         return idx
 
     def compileStatements(self, start: int, end_statements: int) -> None:
@@ -150,13 +166,13 @@ class CompilationEngine:
         """
         'do' subroutineCall ';'
         """
-        self.token_objects[start].before = '<doStatement>'
+        self.token_objects[start].before.append('<doStatement>')
         idx: int = start
         while idx <= end_statements:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after = '</doStatement>'
+        self.token_objects[idx].after.append('</doStatement>')
         self.compileSubroutineCall(start + 1, idx - 1)
         return idx
 
@@ -164,9 +180,9 @@ class CompilationEngine:
         """
         'let' varname ('[' expression ']')? '=' expression ';'
         """
-        self.token_objects[start].before = '<letStatement>'
+        self.token_objects[start].before.append('<letStatement>')
         right_operand_start_idx: int = None
-        if self.token_objects[start + 2] == '[':
+        if self.token_objects[start + 2].token == '[':
             closing_expression_idx: int = self.findClosingBracket(start + 2, end_statements, '[', ']')
             self.compileExpression(start + 3, closing_expression_idx - 1)
             right_operand_start_idx = closing_expression_idx + 2
@@ -177,7 +193,7 @@ class CompilationEngine:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after = '</letStatement>'
+        self.token_objects[idx].after.append('</letStatement>')
         self.compileExpression(right_operand_start_idx, idx - 1)
         return idx
 
@@ -185,29 +201,29 @@ class CompilationEngine:
         """
         'while' '(' expression ')' '{' statements '}'
         """
-        self.token_objects[start].before = '<whileStatement>'
+        self.token_objects[start].before.append('<whileStatement>')
         # (expression)
         closing_expression_idx: int = self.findClosingBracket(start + 1, end_statements, '(', ')')
         self.compileExpression(start + 2, closing_expression_idx - 1)
         # {statements}
         closing_statements_idx: int = self.findClosingBracket(closing_expression_idx + 1, end_statements, '{', '}')
-        self.token_objects[closing_expression_idx + 2].before = '<statements>'
-        self.token_objects[closing_statements_idx - 1].after = '</statements>'
+        self.token_objects[closing_expression_idx + 2].before.append('<statements>')
         self.compileStatements(closing_expression_idx + 2, closing_statements_idx - 1)
-        self.token_objects[closing_statements_idx].after = '</whileStatement>'
+        self.token_objects[closing_statements_idx - 1].after.append('</statements>')
+        self.token_objects[closing_statements_idx].after.append('</whileStatement>')
         return closing_statements_idx
 
     def compileReturn(self, start: int, end_statements: int) -> int:
         """
         'return' expression? ';'
         """
-        self.token_objects[start].before = '<returnStatement>'
+        self.token_objects[start].before.append('<returnStatement>')
         idx: int = start
         while idx <= end_statements:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after = '</returnStatement>'
+        self.token_objects[idx].after.append('</returnStatement>')
         if idx - start > 1:
             self.compileExpression(start + 1, idx - 1)
         return idx
@@ -216,7 +232,6 @@ class CompilationEngine:
         bracket_cnt: int = 0
         idx: int = start
         while idx <= end:
-            # print(self.token_objects[idx].token, bracket_cnt)
             if self.token_objects[idx].token == open_c:
                 bracket_cnt += 1
             elif self.token_objects[idx].token == close_c:
@@ -230,34 +245,79 @@ class CompilationEngine:
         """
         'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?
         """
-        self.token_objects[start].before = '<ifStatement>'
+        self.token_objects[start].before.append('<ifStatement>')
         # (expression)
         closing_expression_idx: int = self.findClosingBracket(start + 1, end_statements, '(', ')')
         self.compileExpression(start + 2, closing_expression_idx - 1)
         # {statements}
         closing_statements_idx: int = self.findClosingBracket(closing_expression_idx + 1, end_statements, '{', '}')
-        self.token_objects[closing_expression_idx + 2].before = '<statements>'
-        self.token_objects[closing_statements_idx - 1].after = '</statements>'
+        self.token_objects[closing_expression_idx + 2].before.append('<statements>')
         self.compileStatements(closing_expression_idx + 2, closing_statements_idx - 1)
+        self.token_objects[closing_statements_idx - 1].after.append('</statements>')
         # else
         if (closing_statements_idx == end_statements) or (
                 self.token_objects[closing_statements_idx + 1].token != 'else'):
-            self.token_objects[closing_statements_idx].after = '</ifStatement>'
+            self.token_objects[closing_statements_idx].after.append('</ifStatement>')
             return closing_statements_idx
         # {statements}
         closing_else_statements_idx: int = self.findClosingBracket(closing_statements_idx + 2, end_statements, '{', '}')
-        self.token_objects[closing_statements_idx + 3].before = '<statements>'
-        self.token_objects[closing_else_statements_idx - 1].after = '</statements>'
+        self.token_objects[closing_statements_idx + 3].before.append('<statements>')
         self.compileStatements(closing_statements_idx + 3, closing_else_statements_idx - 1)
-        self.token_objects[closing_else_statements_idx].after = '</ifStatement>'
+        self.token_objects[closing_else_statements_idx - 1].after.append('</statements>')
+        self.token_objects[closing_else_statements_idx].after.append('</ifStatement>')
         return closing_else_statements_idx
 
-    def compileExpression(self, start: int, end: int) -> None:
+    def compileExpression(self, start: int, end_exp: int) -> None:
         """
         term (op term)*
         """
-        self.token_objects[start].before = '<expression>'
-        self.token_objects[end].after = '</expression>'
+        self.token_objects[start].before.append('<expression>')
+        if start > end_exp:
+            return
+        idx: int = start
+        while idx <= end_exp:
+            # print(idx, end_exp)
+            idx = self.compileTerm(idx, end_exp)
+            idx += 1
+            if self.token_objects[idx].token in ['+', '-', '*', '/', '&', '|', '<', '>', '=']:
+               idx += 1 
+        self.token_objects[end_exp].after.append('</expression>')
+
+    def compileTerm(self, start: int, end_exp: int) -> None:
+        self.token_objects[start].before.append('<term>')
+        first_token: str = self.token_objects[start].token
+        print(first_token)
+        end_idx: int = start
+        if end_exp - start < 1:
+            end_idx = end_exp
+        # '(' expression ')'
+        if first_token == '(':
+            closing_term: int = self.findClosingBracket(start, end_exp, '(', ')')
+            self.compileExpression(start + 1, closing_term - 1)
+            end_idx = closing_term
+        # unaryOp
+        elif first_token in ['-', '~']:
+            closing_right_operand: int = self.compileTerm(start + 1, end_exp)
+            end_idx = closing_right_operand
+        # varName '[' expression ']'
+        elif self.token_objects[start + 1].token == '[':
+            closing_term: int = self.findClosingBracket(start, end_exp, '[', ']')
+            self.compileExpression(start + 2, closing_term - 1)
+            end_idx = closing_term
+        # subroutineName '(' expressionList ')'
+        elif self.token_objects[start + 1].token == '(':
+            print('subroutine')
+            closing_term: int = self.findClosingBracket(start + 1, end_exp, '(', ')')
+            self.compileSubroutineCall(start, closing_term)
+            end_idx = closing_term
+        # (className | varName) '.' subroutineName '(' expressionList ')'
+        elif self.token_objects[start + 1].token == '.':
+            print('subroutine')
+            closing_term: int = self.findClosingBracket(start + 3, end_exp, '(', ')')
+            self.compileSubroutineCall(start, closing_term)
+            end_idx = closing_term
+        self.token_objects[end_idx].after.append('</term>')
+        return end_idx
 
     def saveToFile(self) -> None:
         self.output += '\n'.join([token_object.format() for token_object in self.token_objects]) + '\n'
