@@ -1,70 +1,12 @@
 import pathlib
 import sys
-from tokenizer import TokenObject, JackTokenizer
-
-
-class SymbolTable:
-    def __init__(self) -> None:
-        self.class_scope = self.subroutine_scope = {}
-        self.static_num = self.field_num = self.arg_num = self.local_num = 0
-
-    def clearClassScope(self) -> None:
-        self.class_scope = {}
-
-    def clearSubroutineScope(self) -> None:
-        self.subroutine_scope = {}
-
-    def createItem(self, name: str, type: str, kind: str, num: int) -> dict:
-        return {
-            'name': name,
-            'type': type,
-            'kind': kind,
-            'num': num
-        }
-
-    def define(self, name: str, type: str, kind: str) -> dict:
-        num: int = None
-        item: dict = None
-        if len(kind) != 3:
-            if kind == 'STATIC':
-                num = self.static_num
-                self.static_num += 1
-            else:  # FIELD
-                num = self.field_num
-                self.field_num += 1
-            item = self.createItem(name, type, kind, num)
-            self.class_scope[name] = item
-            print('defined', 'class_scope', name, type, kind, num)
-        else:
-            if kind == 'ARG':
-                num = self.arg_num
-                self.arg_num += 1
-            else:  # VAR
-                num = self.local_num
-                self.local_num += 1
-            item = self.createItem(name, type, kind, num)
-            self.subroutine_scope[name] = item
-            print('defined', 'subroutine_scope', name, type, kind, num)
-        return item
-
-    def refer(self, name):
-        item: dict = None
-        # print(self.class_scope)
-        # print(self.subroutine_scope)
-        if name in self.subroutine_scope.keys():
-            item = self.subroutine_scope[name]
-            print('used', 'subroutine_scope', item['name'], item['type'], item['kind'], item['num'])
-            return item
-        if name in self.class_scope.keys():
-            item = self.class_scope[name]
-            print('used', 'class_scope', item['name'], item['type'], item['kind'], item['num'])
-            return item
-        raise(Exception(name, 'is Not defined'))
+from xmlrpc.client import boolean
+from tokenizer import JackTokenizer
+from symbolTable import SymbolTable
 
 
 class CompilationEngine:
-    def __init__(self, token_objects: 'list[TokenObject]', p_file: str) -> None:
-        self.token_objects = token_objects
+    def __init__(self, symbol_table: SymbolTable, p_file: str) -> None:
         self.p_file = p_file
         self.statement_keyword_dic = {
             'let': self.compileLet,
@@ -72,12 +14,32 @@ class CompilationEngine:
             'while': self.compileWhile,
             'do': self.compileDo,
             'return': self.compileReturn}
+        self.binary_operator_dic = {
+            '+': 'add',
+            '-': 'sub',
+            '=': 'eq',
+            '>': 'gt',
+            '<': 'lt',
+            '&': 'and',
+            '|': 'or',
+            '*': 'call Math.multiply 2',  # The number of local arguments is 2
+            '/': 'call Math.divide 2'
+        }
+        # self.output = self.class_name = self.class_b_str = self.class_e_str = ''
         self.output = ''
-        self.class_name: str = ''
-        self.symbol_table = SymbolTable()
+        self.output_line_list = []
+        self.output_line_cnt = 0
+        self.parameter_cnt = 0
+        self.while_cnt = self.if_cnt = 0
+        self.symbol_table = symbol_table
+        tokenizer = JackTokenizer(p_file)
+        while tokenizer.hasMoreLine():
+            tokenizer.advance()
+        self.token_objects = tokenizer.token_objects
         pass
 
-    def compile(self):
+    def compile(self, is_first_run=False):
+        self.is_first_run = is_first_run
         self.compileClasses(0, len(self.token_objects) - 1)
 
     def compileClasses(self, start: int, end_script: int):
@@ -93,10 +55,9 @@ class CompilationEngine:
         """
         self.class_name = self.token_objects[start + 1].token
         self.symbol_table.clearClassScope()
-        self.token_objects[start].before.append('<class>')
+        self.field_cnt = 0
         closing_class_body_idx: int = self.findClosingBracket(start + 2, end_script, '{', '}')
         self.compileClassBody(start + 3, closing_class_body_idx - 1)
-        self.token_objects[closing_class_body_idx].after.append('</class>')
         return closing_class_body_idx
 
     def compileClassBody(self, start: int, end_class_body: int):
@@ -118,18 +79,18 @@ class CompilationEngine:
         ('static' | 'field') type varName (',' varName) * ';'
         ex) 'static int a;'
         """
-        self.token_objects[start].before.append('<classVarDec>')
         kind: str = self.token_objects[start].token.upper()
         type: str = self.token_objects[start + 1].token
-        idx: int = start
+        idx: int = start + 2
         while idx <= end_class_body:
             if self.token_objects[idx].token == ';':
                 break
             if self.token_objects[idx].token_type == 'IDENTIFIER':
                 varname: str = self.token_objects[idx].token
                 self.symbol_table.define(varname, type, kind)
+                if kind == 'FIELD':
+                    self.field_cnt += 1
             idx += 1
-        self.token_objects[idx].after.append('</classVarDec>')
         return idx
 
     def compileSubroutineDec(self, start: int, end_class_body: int) -> int:
@@ -137,15 +98,38 @@ class CompilationEngine:
         ('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' '{' subroutineBody '}'
         ex) 'method int hoge (...) {...}'
         """
-        self.symbol_table.clearSubroutineScope()
-        self.token_objects[start].before.append('<subroutineDec>')
+        # Look for the end of the parameter list
         closing_param_list_idx: int = self.findClosingBracket(start + 3, end_class_body, '(', ')')
-        self.compileParameterList(start + 4, closing_param_list_idx - 1)
-        self.token_objects[closing_param_list_idx + 1].before.append('<subroutineBody>')
+        # Look for the end of the subroutine body
         closing_subr_body_idx: int = self.findClosingBracket(closing_param_list_idx + 1, end_class_body, '{', '}')
-        self.token_objects[closing_subr_body_idx].after.append('</subroutineBody>')
+        # Register to subroutine dictionary
+        subroutine_kind = self.token_objects[start + 0].token
+        subroutine_type = self.token_objects[start + 1].token
+        subroutine_name = self.token_objects[start + 2].token
+        if self.is_first_run:
+            print(self.class_name, subroutine_name)
+            self.symbol_table.defineSubroutine(self.class_name, subroutine_name, subroutine_type, subroutine_kind)
+            return closing_subr_body_idx
+        # Clear symbol table
+        self.symbol_table.clearSubroutineScope()
+        self.while_cnt = self.if_cnt = 0
+        # Declare function
+        dec_line_num: int = self.addOutputLines(
+            [f'function {self.class_name}.{subroutine_name} LOCAL_VAR_CNT']) - 1
+        # If contructor, alloc the class variables
+        if (subroutine_kind == 'constructor') and (self.field_cnt != 0):
+            self.addOutputLines([f'push constant {self.field_cnt}', 'call Memory.alloc 1', 'pop pointer 0'])
+        # If method, push the first argument (instance)
+        if subroutine_kind == 'method':
+            self.addOutputLines(['push argument 0', 'pop pointer 0'])
+        # Compile parameterList
+        if subroutine_kind == 'method':
+            self.symbol_table.arg_num = 1
+        self.compileParameterList(start + 4, closing_param_list_idx - 1)
+        # Compile subroutineBody
         self.compileSubroutineBody(closing_param_list_idx + 2, closing_subr_body_idx - 1)
-        self.token_objects[closing_subr_body_idx].after.append('</subroutineDec>')
+        # Replace LOCAL_VAR_CNT to symbol_table.local_num
+        self.output_line_list[dec_line_num] = f'function {self.class_name}.{subroutine_name} {self.symbol_table.local_num}'
         return closing_subr_body_idx
 
     def compileSubroutineBody(self, start: int, end_body: int) -> None:
@@ -156,13 +140,11 @@ class CompilationEngine:
         if start >= end_body:
             return
         first_token: str = self.token_objects[start].token
-        if first_token == 'var':
+        if first_token == 'var':  # varDec
             end_idx: int = self.compileVarDec(start, end_body)
             return self.compileSubroutineBody(end_idx + 1, end_body)
-        else:
-            self.token_objects[start].before.append('<statements>')
-            end_idx: int = self.compileStatements(start, end_body)
-            self.token_objects[end_body].after.append('</statements>')
+        else:  # statements
+            end_idx = self.compileStatements(start, end_body)
             return
 
     def compileSubroutineCall(self, start: int, end: int) -> None:
@@ -171,17 +153,43 @@ class CompilationEngine:
         (className | varName) '.' subroutineName '(' expressionList ')'
         ex) 'run()', 'a.run()'
         """
-        # self.token_objects[start].before.append('<term>')
+        # Process (className | varName) '.' subroutineName
+        call_str = None
+        is_method: bool = False
+        if self.token_objects[start + 1].token != '.':  # run()
+            is_method = True
+            subroutine_name = self.token_objects[start].token
+            self.addOutputLines(['push pointer 0'])
+            call_str = f'call {self.class_name}.{subroutine_name} '
+        else:
+            # a.run()
+            class_or_instance_name = self.token_objects[start].token
+            subroutine_name = self.token_objects[start + 2].token
+            # When a is an instance and run() is a method
+            for scope in [self.symbol_table.subroutine_scope, self.symbol_table.class_scope]:
+                if class_or_instance_name in scope.keys():
+                    is_method = True
+                    item: dict = scope[class_or_instance_name]
+                    self.addOutputLines([f'push {item["kind_alias"]} {item["num"]}'])  # push the instance
+                    call_str = f'call {item["type"]}.{subroutine_name} '
+                    break
+            else:  # When a is a class name and run() is a constructor or a function
+                call_str = f'call {class_or_instance_name}.{subroutine_name} '
+        # Compile expressionList
         idx: int = start
         while self.token_objects[idx].token != '(':
             idx += 1
-        self.token_objects[idx].after.append('<expressionList>')
         closing_expression_list = self.findClosingBracket(idx, end, '(', ')')
         self.compileExpressionList(idx + 1, closing_expression_list - 1)
-        self.token_objects[closing_expression_list].before.append('</expressionList>')
-        # self.token_objects[end].after.append('</term>')
+        # Compile call
+        parameter_cnt = self.parameter_cnt + (1 if is_method else 0)
+        self.addOutputLines([call_str + str(parameter_cnt)])
 
     def compileExpressionList(self, start: int, end: int) -> None:
+        """
+        Split expression list by ',' and process by compileExpression
+        """
+        self.parameter_cnt = 0
         if start > end:
             return
         idx: int = start
@@ -190,20 +198,16 @@ class CompilationEngine:
             if self.token_objects[idx].token == ',':
                 self.compileExpression(exp_start_idx, idx - 1)
                 exp_start_idx = idx + 1
+                self.parameter_cnt += 1
             idx += 1
         self.compileExpression(exp_start_idx, end)
+        self.parameter_cnt += 1
 
-    def compileParameterList(self, start: int, end: int):
+    def compileParameterList(self, start: int, end: int) -> None:
         """
         ((type varName) (',' type varName)*)?
         ex) 'int a, char c', ''
         """
-        if start > end:
-            self.token_objects[end].after.append('<parameterList>')
-            self.token_objects[start].before.append('</parameterList>')
-        else:
-            self.token_objects[start].before.append('<parameterList>')
-            self.token_objects[end].after.append('</parameterList>')
         idx: int = start
         name = type = None
         while idx <= end:
@@ -217,7 +221,6 @@ class CompilationEngine:
         'var' type varName (',' varname)* ';'
         ex) 'var int a, b;';
         """
-        self.token_objects[start].before.append('<varDec>')
         type: str = self.token_objects[start + 1].token
         idx: int = start + 2
         while idx <= end_body:
@@ -227,12 +230,16 @@ class CompilationEngine:
                 name: str = self.token_objects[idx].token
                 self.symbol_table.define(name, type, 'VAR')
             idx += 1
-        self.token_objects[idx].after.append('</varDec>')
         return idx
 
     def compileStatements(self, start: int, end_statements: int) -> None:
+        """
+        Call (compileLet | compileIf | compileWhile | compileDo | compileReturn) and
+        process statements recursively
+        """
         if start >= end_statements:
             return
+        # Decide which function to call by its first token
         first_token: str = self.token_objects[start].token
         end_statement: int = self.statement_keyword_dic[first_token](start, end_statements)
         self.compileStatements(end_statement + 1, end_statements)
@@ -241,68 +248,83 @@ class CompilationEngine:
         """
         'do' subroutineCall ';'
         """
-        self.token_objects[start].before.append('<doStatement>')
         idx: int = start
         while idx <= end_statements:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after.append('</doStatement>')
         self.compileSubroutineCall(start + 1, idx - 1)
+        self.addOutputLines(['pop temp 0'])
         return idx
 
     def compileLet(self, start: int, end_statements: int) -> int:
         """
         'let' varname ('[' expression ']')? '=' expression ';'
+        ex) 'let a[1] = b + c;'
         """
-        self.token_objects[start].before.append('<letStatement>')
+        # Process varname
         varname: str = self.token_objects[start + 1].token
-        self.symbol_table.refer(varname)
+        item: dict = self.symbol_table.refer(varname)
+        # Detect the start of the right operand
         right_operand_start_idx: int = None
-        if self.token_objects[start + 2].token == '[':
-            closing_expression_idx: int = self.findClosingBracket(start + 2, end_statements, '[', ']')
-            self.compileExpression(start + 3, closing_expression_idx - 1)
+        is_exp_in_left: bool = False
+        # If expression is in the left operand
+        if self.token_objects[start + 2].token == '[':  # If expression in the left operand
+            is_exp_in_left = True
+            # Process expression in the left operand
+            closing_expression_idx = self.findClosingBracket(start + 2, end_statements, '[', ']')
+            self.compileExpression(start + 3, closing_expression_idx)
+            # Push the array var
+            self.addOutputLines([f'push {item["kind_alias"]} {item["num"]}'])
+            # Use 'that' segment to access varname[expression]
+            self.addOutputLines(['add'])
             right_operand_start_idx = closing_expression_idx + 2
-        else:
+        else:  # If no expression in the reft operand
             right_operand_start_idx = start + 3
+        # Process right operand
         idx: int = right_operand_start_idx
         while idx <= end_statements:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after.append('</letStatement>')
         self.compileExpression(right_operand_start_idx, idx - 1)
+        if is_exp_in_left:
+            self.addOutputLines(['pop temp 0', 'pop pointer 1', 'push temp 0', 'pop that 0'])
+        else:
+            self.addOutputLines([f'pop {item["kind_alias"]} {item["num"]}'])
         return idx
 
     def compileWhile(self, start: int, end_statements: int) -> int:
         """
         'while' '(' expression ')' '{' statements '}'
         """
-        self.token_objects[start].before.append('<whileStatement>')
+        self.while_cnt += 1
+        org_while_cnt = self.while_cnt
+        self.addOutputLines([f'label WHILE_EXP{org_while_cnt - 1}'])
         # (expression)
         closing_expression_idx: int = self.findClosingBracket(start + 1, end_statements, '(', ')')
         self.compileExpression(start + 2, closing_expression_idx - 1)
+        self.addOutputLines(['not', f'if-goto WHILE_END{org_while_cnt - 1}'])
         # {statements}
         closing_statements_idx: int = self.findClosingBracket(closing_expression_idx + 1, end_statements, '{', '}')
-        self.token_objects[closing_expression_idx + 2].before.append('<statements>')
         self.compileStatements(closing_expression_idx + 2, closing_statements_idx - 1)
-        self.token_objects[closing_statements_idx - 1].after.append('</statements>')
-        self.token_objects[closing_statements_idx].after.append('</whileStatement>')
+        self.addOutputLines([f'goto WHILE_EXP{org_while_cnt - 1}', f'label WHILE_END{org_while_cnt - 1}'])
         return closing_statements_idx
 
     def compileReturn(self, start: int, end_statements: int) -> int:
         """
         'return' expression? ';'
         """
-        self.token_objects[start].before.append('<returnStatement>')
         idx: int = start
         while idx <= end_statements:
             if self.token_objects[idx].token == ';':
                 break
             idx += 1
-        self.token_objects[idx].after.append('</returnStatement>')
-        if idx - start > 1:
+        if idx - start > 1:  # if there is expression
             self.compileExpression(start + 1, idx - 1)
+        else:  # no expression (void)
+            self.addOutputLines(['push constant 0'])
+        self.addOutputLines(['return'])
         return idx
 
     def findClosingBracket(self, start: int, end: int, open_c: str, close_c: str) -> int:
@@ -322,51 +344,55 @@ class CompilationEngine:
         """
         'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?
         """
-        self.token_objects[start].before.append('<ifStatement>')
+        self.if_cnt += 1
+        org_if_cnt = self.if_cnt
         # (expression)
         closing_expression_idx: int = self.findClosingBracket(start + 1, end_statements, '(', ')')
         self.compileExpression(start + 2, closing_expression_idx - 1)
-        # {statements}
+        self.addOutputLines([f'if-goto IF_TRUE{org_if_cnt - 1}',
+                             f'goto IF_FALSE{org_if_cnt - 1}',
+                             f'label IF_TRUE{org_if_cnt - 1}'])
+        # {statements} when true
         closing_statements_idx: int = self.findClosingBracket(closing_expression_idx + 1, end_statements, '{', '}')
-        self.token_objects[closing_expression_idx + 2].before.append('<statements>')
         self.compileStatements(closing_expression_idx + 2, closing_statements_idx - 1)
-        self.token_objects[closing_statements_idx - 1].after.append('</statements>')
-        # else
+        # If no 'else'
         if (closing_statements_idx == end_statements) or (
                 self.token_objects[closing_statements_idx + 1].token != 'else'):
-            self.token_objects[closing_statements_idx].after.append('</ifStatement>')
+            self.addOutputLines([f'label IF_FALSE{org_if_cnt - 1}'])
             return closing_statements_idx
+        self.addOutputLines([f'goto IF_END{org_if_cnt - 1}', f'label IF_FALSE{org_if_cnt - 1}'])
         # {statements}
         closing_else_statements_idx: int = self.findClosingBracket(closing_statements_idx + 2, end_statements, '{', '}')
-        self.token_objects[closing_statements_idx + 3].before.append('<statements>')
         self.compileStatements(closing_statements_idx + 3, closing_else_statements_idx - 1)
-        self.token_objects[closing_else_statements_idx - 1].after.append('</statements>')
-        self.token_objects[closing_else_statements_idx].after.append('</ifStatement>')
+        self.addOutputLines([f'label IF_END{org_if_cnt - 1}'])
         return closing_else_statements_idx
 
     def compileExpression(self, start: int, end_exp: int) -> None:
         """
         term (op term)*
         """
-        self.token_objects[start].before.append('<expression>')
         if start > end_exp:
             return
         idx: int = start
         while idx <= end_exp:
-            idx = self.compileTerm(idx, end_exp)
-            idx += 1
             if self.token_objects[idx].token in ['+', '-', '*', '/', '&', '|', '<', '>', '=']:
-                idx += 1
-        self.token_objects[end_exp].after.append('</expression>')
+                operator: str = self.token_objects[idx].token
+                idx_org: int = idx
+                idx = self.compileTerm(idx + 1, end_exp) + 1
+                if (idx_org == start) and (operator == '-'):
+                    self.addOutputLines(['neg'])
+                else:
+                    self.addOutputLines([f'{self.binary_operator_dic[operator]}'])
+            else:
+                idx = self.compileTerm(idx, end_exp) + 1
 
     def compileTerm(self, start: int, end_exp: int) -> None:
-        # for i in range(start, end_exp + 1):
-        #     print(self.token_objects[i].token, end=' ')
-        # print('')
-        self.token_objects[start].before.append('<term>')
+        """
+        Cut out and compile the first term of the given expression
+        """
         first_token: str = self.token_objects[start].token
-        # One-word term is the default
         end_idx: int = start
+        # One-word term
         if end_exp - start < 1:
             end_idx = end_exp
         # '(' expression ')'
@@ -377,13 +403,21 @@ class CompilationEngine:
         # unaryOp
         elif first_token in ['-', '~']:
             closing_right_operand: int = self.compileTerm(start + 1, end_exp)
+            unary_str: str = 'neg' if first_token == '-' else 'not'
+            self.addOutputLines([unary_str])
             end_idx = closing_right_operand
         # varName '[' expression ']'
         elif self.token_objects[start + 1].token == '[':
-            varname: str = self.token_objects[start].token
-            self.symbol_table.refer(varname)
-            closing_term: int = self.findClosingBracket(start, end_exp, '[', ']')
+            # Process expression
+            closing_term: int = self.findClosingBracket(start + 1, end_exp, '[', ']')
             self.compileExpression(start + 2, closing_term - 1)
+            # Process varname
+            varname: str = self.token_objects[start].token
+            item: dict = self.symbol_table.refer(varname)
+            # print(item)
+            self.addOutputLines([f'push {item["kind_alias"]} {item["num"]}'])
+            # Place the value of 'varname[expression]' to stack top
+            self.addOutputLines(['add', 'pop pointer 1', 'push that 0'])
             end_idx = closing_term
         # subroutineName '(' expressionList ')'
         elif self.token_objects[start + 1].token == '(':
@@ -395,20 +429,39 @@ class CompilationEngine:
             closing_term: int = self.findClosingBracket(start + 3, end_exp, '(', ')')
             self.compileSubroutineCall(start, closing_term)
             end_idx = closing_term
+        elif self.token_objects[start].token == 'true':
+            self.addOutputLines(['push constant 0', 'not'])
+        elif self.token_objects[start].token == 'false':
+            self.addOutputLines(['push constant 0'])
+        elif self.token_objects[start].token == 'this':
+            self.addOutputLines(['push pointer 0'])
+        elif self.token_objects[start].token == 'null':
+            self.addOutputLines(['push constant 0'])
         elif self.token_objects[start].token_type == 'IDENTIFIER':
             varname: str = self.token_objects[start].token
-            self.symbol_table.refer(varname)
-        self.token_objects[end_idx].after.append('</term>')
-        # for i in range(start, end_idx + 1):
-        #     print(self.token_objects[i].token, end=' ')
-        # print('')
+            item: dict = self.symbol_table.refer(varname)
+            self.addOutputLines([f'push {item["kind_alias"]} {item["num"]}'])
+        elif self.token_objects[start].token_type == 'STRING_CONST':
+            self.compileStringConst(self.token_objects[start].token)
+        elif self.token_objects[start].token_type == 'INT_CONST':
+            self.addOutputLines([f'push constant {self.token_objects[start].token}'])
         return end_idx
 
+    def compileStringConst(self, s: str):
+        self.addOutputLines([f'push constant {len(s)}', 'call String.new 1'])
+        for i in range(len(s)):
+            self.addOutputLines([f'push constant {ord(s[i])}', 'call String.appendChar 2'])
+
+    def addOutputLines(self, lines: 'list[str]') -> None:
+        self.output_line_list.extend(lines)
+        self.output_line_cnt += len(lines)
+        return self.output_line_cnt
+
     def saveToFile(self) -> None:
-        self.output += '\n'.join([token_object.format() for token_object in self.token_objects]) + '\n'
-        self.path_w = f'{self.p_file.parent}/{self.p_file.stem}.xml'
+        output = '\n'.join(compiler.output_line_list) + '\n'
+        self.path_w = f'{self.p_file.parent}/{self.p_file.stem}.vm'
         with open(self.path_w, mode='w') as f:
-            f.write(self.output)
+            f.write(output)
 
 
 if __name__ == '__main__':
@@ -420,11 +473,18 @@ if __name__ == '__main__':
     else:
         p_file_list = [p_path]
 
+    symbol_table = SymbolTable()
+
+    # for p_file in p_file_list:
+    #     print(p_file)
+    #     compiler = CompilationEngine(symbol_table, p_file)
+    #     compiler.compile(is_first_run=True)
+
+    # print(compiler.symbol_table.subroutine_dic)
+    # print(compiler.symbol_table.class_scope)
+
     for p_file in p_file_list:
         print(p_file)
-        tokenizer = JackTokenizer(p_file)
-        while tokenizer.hasMoreLine():
-            tokenizer.advance()
-        compiler = CompilationEngine(tokenizer.token_objects, p_file)
+        compiler = CompilationEngine(symbol_table, p_file)
         compiler.compile()
         compiler.saveToFile()
