@@ -21,6 +21,9 @@ class CompilationEngine:
         self.compileClasses(0, len(self.token_objects) - 1)
 
     def compileClasses(self, start: int, end_script: int):
+        """
+        Compile classes (whole script) recursively
+        """
         if start >= end_script:
             return
         closing_class_idx = self.compileClass(start, end_script)
@@ -75,8 +78,10 @@ class CompilationEngine:
         """
         self.token_objects[start].before.append('<subroutineDec>')
         print(self.token_objects[start + 2].token)
+        # compile '(' parameterList ')'
         closing_param_list_idx: int = self.findClosingBracket(start + 3, end_class_body, '(', ')')
         self.compileParameterList(start + 4, closing_param_list_idx - 1)
+        # compile '{' subroutineBody '}'
         self.token_objects[closing_param_list_idx + 1].before.append('<subroutineBody>')
         closing_subr_body_idx: int = self.findClosingBracket(closing_param_list_idx + 1, end_class_body, '{', '}')
         self.token_objects[closing_subr_body_idx].after.append('</subroutineBody>')
@@ -118,6 +123,10 @@ class CompilationEngine:
         # self.token_objects[end].after.append('</term>')
 
     def compileExpressionList(self, start: int, end: int) -> None:
+        """
+        (expression (',' expression)*)?
+        ex) '(a + 1, b)'
+        """
         if start > end:
             return
         idx: int = start
@@ -179,10 +188,11 @@ class CompilationEngine:
     def compileLet(self, start: int, end_statements: int) -> int:
         """
         'let' varname ('[' expression ']')? '=' expression ';'
+        ex) 'let a = 5;', 'let a[4] = b + 3;'
         """
         self.token_objects[start].before.append('<letStatement>')
         right_operand_start_idx: int = None
-        if self.token_objects[start + 2].token == '[':
+        if self.token_objects[start + 2].token == '[':  # if '[' expression ']'
             closing_expression_idx: int = self.findClosingBracket(start + 2, end_statements, '[', ']')
             self.compileExpression(start + 3, closing_expression_idx - 1)
             right_operand_start_idx = closing_expression_idx + 2
@@ -280,7 +290,7 @@ class CompilationEngine:
             idx = self.compileTerm(idx, end_exp)
             idx += 1
             if self.token_objects[idx].token in ['+', '-', '*', '/', '&', '|', '<', '>', '=']:
-               idx += 1 
+                idx += 1
         self.token_objects[end_exp].after.append('</expression>')
 
     def compileTerm(self, start: int, end_exp: int) -> None:

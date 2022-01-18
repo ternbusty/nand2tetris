@@ -98,7 +98,7 @@ class JackTokenizer:
         return True if self.current_line_num < self.line_num else False
 
     def advance(self) -> bool:
-        print(self.current_line_num)
+        # print(self.current_line_num)
         line: str = self.lines[self.current_line_num]
         token_objects = self.tokenizeLine(line)
         self.output += '\n'.join([token_object.format() for token_object in token_objects]) + '\n'
